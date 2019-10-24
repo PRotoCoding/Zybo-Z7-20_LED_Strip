@@ -1,0 +1,12 @@
+#-----------------------------------------------------------
+# Webtalk v2018.3 (64-bit)
+# SW Build 2405991 on Thu Dec  6 23:38:27 MST 2018
+# 
+# Start of session at: Thu Oct 24 18:50:03 2019
+# Process ID: 6840
+# Current directory: G:/Vivado_Projects/Zybo-Z7-20_LED_Strip/Zybo-Z7-20_LED_Strip/Vivado/Zybo-Z7-20_TTC.sdk/webtalk
+# Command line: wbtcv.exe -mode batch -source sdk_webtalk.tcl
+# Log file: G:/Vivado_Projects/Zybo-Z7-20_LED_Strip/Zybo-Z7-20_LED_Strip/Vivado/Zybo-Z7-20_TTC.sdk/webtalk/webtalk.log
+# Journal file: G:/Vivado_Projects/Zybo-Z7-20_LED_Strip/Zybo-Z7-20_LED_Strip/Vivado/Zybo-Z7-20_TTC.sdk/webtalk\webtalk.jou
+#-----------------------------------------------------------
+source sdk_webtalk.tcl
