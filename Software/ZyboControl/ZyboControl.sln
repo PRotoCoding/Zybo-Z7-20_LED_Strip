@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.779
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZyboControl", "ZyboControl\ZyboControl.csproj", "{71CECBA9-9312-43F6-A1C9-D250BCB76285}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZyboLogic", "ZyboLogic\ZyboLogic.csproj", "{6259DDDB-C703-4A41-812A-E3478C19F245}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{71CECBA9-9312-43F6-A1C9-D250BCB76285}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{71CECBA9-9312-43F6-A1C9-D250BCB76285}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{71CECBA9-9312-43F6-A1C9-D250BCB76285}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{71CECBA9-9312-43F6-A1C9-D250BCB76285}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6259DDDB-C703-4A41-812A-E3478C19F245}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6259DDDB-C703-4A41-812A-E3478C19F245}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6259DDDB-C703-4A41-812A-E3478C19F245}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6259DDDB-C703-4A41-812A-E3478C19F245}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {00CA2B18-2DC6-45F8-9B53-FD38B84B38DD}
+	EndGlobalSection
+EndGlobal

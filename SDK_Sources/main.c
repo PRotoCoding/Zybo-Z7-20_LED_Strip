@@ -1,65 +1,3 @@
-/******************************************************************************
-*
-* Copyright (C) 2010 - 2015 Xilinx, Inc.  All rights reserved.
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in
-* all copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-* XILINX  BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-* WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF
-* OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE.
-*
-* Except as contained in this notice, the name of the Xilinx shall not be used
-* in advertising or otherwise to promote the sale, use or other dealings in
-* this Software without prior written authorization from Xilinx.
-*
-******************************************************************************/
-/*****************************************************************************/
-/**
-* @file  xttcps_intr_example.c
-*
-* This file contains a example using two timer counters in the Triple Timer
-* Counter (TTC) module in the Ps block in interrupt mode.
-*
-* The example proceeds using interleaving interrupt handling from both
-* timer counters. One timer counter, Ticker, counts how many interrupts
-* has occurred to it, and updates a flag for another timer counter upon
-* a given threshold. Another timer counter, PWM, waits for the flag set
-* from the Ticker, and increases its duty cycle. When the duty cycle of
-* PWM reaches 100, the example terminates.
-*
-* @note
-*  The example may take seconds to minutes to finish. A small setting of
-*  PWM_DELTA_DUTY gives a long running time, while a large setting makes
-*  the example finishes faster.
-*
-* <pre>
-* MODIFICATION HISTORY:
-*
-* Ver  Who    Date     Changes
-* ---- ------ -------- ---------------------------------------------
-* 1.00 drg/jz 01/23/10 First release
-* 3.01 pkp	  01/30/16 Modified SetupTimer to remove XTtcps_Stop before TTC
-*					   configuration as it is added in xttcps.c in
-*					   XTtcPs_CfgInitialize
-* 3.2  mus    10/28/16 Updated TmrCntrSetup as per prototype of
-*                      XTtcPs_CalcIntervalFromFreq
-*</pre>
-******************************************************************************/
-
-/***************************** Include Files *********************************/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include "xparameters.h"
@@ -68,33 +6,33 @@
 #include "xttcps.h"
 #include "xscugic.h"
 #include "xil_printf.h"
+#include "xuartps.h"
+
+/************************** Command Definition *******************************/
+#define COMMAND_ID_MASK							0xFF
+
+#define COMMAND_SET_SINGLE_LED					0x01
+
+#define COMMAND_SET_MULTIPLE_LEDS 				0x02
+#define COMMAND_SET_MULTIPLE_LEDS_NUMBER_MASK	0xFF00
+#define COMMAND_SET_MULTIPLE_LEDS_NUMBER_OFFSET	8
+
 
 /************************** Constant Definitions *****************************/
-
 /*
  * The following constants map to the XPAR parameters created in the
  * xparameters.h file. They are only defined here such that a user can easily
  * change all the needed parameters in one place.
  */
-#define TTC_TICK_DEVICE_ID	XPAR_XTTCPS_1_DEVICE_ID
-#define TTC_TICK_INTR_ID	XPAR_XTTCPS_1_INTR
-
 #define TTC_PWM_DEVICE_ID	XPAR_XTTCPS_0_DEVICE_ID
 #define TTC_PWM_INTR_ID		XPAR_XTTCPS_0_INTR
 #define TTCPS_CLOCK_HZ		XPAR_XTTCPS_0_CLOCK_HZ
-
 #define INTC_DEVICE_ID		XPAR_SCUGIC_SINGLE_DEVICE_ID
 
 /*
  * Constants to set the basic operating parameters.
- * PWM_DELTA_DUTY is critical to the running time of the test. Smaller values
- * make the test run longer.
  */
-#define	TICK_TIMER_FREQ_HZ	PWM_OUT_FREQ * 2 /* Tick timer counter's output frequency */
-#define	PWM_OUT_FREQ		800000 / 2  /* PWM timer counter's output frequency */
-
-#define PWM_DELTA_DUTY	5 /* Initial and increment to duty cycle for PWM */
-#define TICKS_PER_CHANGE_PERIOD TICK_TIMER_FREQ_HZ * 5 /* Tick signals PWM */
+#define	PWM_OUT_FREQ		800000  /* PWM timer counter's output frequency */
 
 /**************************** Type Definitions *******************************/
 typedef struct {
@@ -112,24 +50,20 @@ typedef struct {
 static int TmrInterruptExample(void);  /* Main test */
 
 /* Set up routines for timer counters */
-static int SetupTicker(void);
 static int SetupPWM(void);
 static int SetupTimer(int DeviceID);
 static void SetPwmMatchValue(void);
 /* Interleaved interrupt test for both timer counters */
-static int WaitForDutyCycleFull(void);
-
+static int MainProgram(void);
+static int HandleCommands(u32 command, u8 data);
 static int SetupInterruptSystem(u16 IntcDeviceID, XScuGic *IntcInstancePtr);
-
-static void TickHandler(void *CallBackRef);
 static void PWMHandler(void *CallBackRef);
 
 /************************** Variable Definitions *****************************/
 
 static XTtcPs TtcPsInst[2];	/* Two timer counters */
 
-static TmrCntrSetup SettingsTable[2] = {
-	{TICK_TIMER_FREQ_HZ, 0, 0, 0},	/* Ticker timer counter initial setup, only output freq */
+static TmrCntrSetup SettingsTable[1] = {
 	{PWM_OUT_FREQ, 0, 0, 0}, /* PWM timer counter initial setup, only output freq */
 };
 
@@ -143,11 +77,17 @@ static volatile u8 ErrorCount;		/* Errors seen at interrupt time */
 static volatile u32 TickCount;		/* Ticker interrupts between PWM change */
 static volatile u32 nextMatchValue;
 
-typedef struct {
-	u8 green;
-	u8 red;
-	u8 blue;
-} LedType;
+typedef union {
+	struct {
+		u8 green;
+		u8 red;
+		u8 blue;
+		u8 reserved;
+	} led;
+	u32 color;
+}LedType;
+
+enum CommandReceiveState { Command, Data };
 
 #define MAX_LED_NUMBER 144
 
@@ -156,100 +96,10 @@ static volatile u32 MatchValues[2];
 static volatile u8 BitCount = 7;
 static volatile u8 ByteCount = 0;
 XTtcPs* Timer = &(TtcPsInst[TTC_PWM_DEVICE_ID]);
-/*
-static LedType Leds[MAX_LED_NUMBER] = {
-		{0, 255, 0},
-		{100, 0, 0},
-		{100, 0, 0},
-		{0, 100, 0},
-		{0, 0, 100},
-		{0, 0, 100},
-		{0, 0, 100},
-		{0, 0, 50},
-		{0, 0, 50},
-		{0, 0, 50}
-};*/
-
-static LedType Leds[MAX_LED_NUMBER] = {
-		//{0x00, 0x0, 0x0},
-		{0x1, 0x00, 0xFF},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0xFF},
-		{0xFF, 0x00, 0},
-		{0xFF, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0},
-		{0x1, 0xFE, 0}
-};
-
+static LedType Leds[MAX_LED_NUMBER];
 static volatile LedType* currentLed = &Leds[0];
+enum CommandReceiveState commandState = Command;
+static u8 PwmStarted = 0;
 
 /*****************************************************************************/
 /**
@@ -314,14 +164,6 @@ static int TmrInterruptExample(void)
 	}
 
 	/*
-	 * Set up the Ticker timer
-	 */
-	Status = SetupTicker();
-	if (Status != XST_SUCCESS) {
-		return Status;
-	}
-
-	/*
 	 * Set up  the PWM timer
 	 */
 	Status = SetupPWM();
@@ -329,90 +171,14 @@ static int TmrInterruptExample(void)
 		return Status;
 	}
 
-	/*
-	 * Enable interrupts
-	 */
-
-	Status = WaitForDutyCycleFull();
+	Status = MainProgram();
 	if (Status != XST_SUCCESS) {
 		return Status;
 	}
-
-	/*
-	 * Stop the counters
-	 */
-	XTtcPs_Stop(&(TtcPsInst[TTC_TICK_DEVICE_ID]));
 
 	XTtcPs_Stop(&(TtcPsInst[TTC_PWM_DEVICE_ID]));
 
 	return XST_SUCCESS;
-}
-
-/****************************************************************************/
-/**
-*
-* This function sets up the Ticker timer.
-*
-* @param	None
-*
-* @return	XST_SUCCESS if everything sets up well, XST_FAILURE otherwise.
-*
-* @note		None
-*
-*****************************************************************************/
-int SetupTicker(void)
-{
-	int Status;
-	TmrCntrSetup *TimerSetup;
-	XTtcPs *TtcPsTick;
-
-	TimerSetup = &(SettingsTable[TTC_TICK_DEVICE_ID]);
-
-	/*
-	 * Set up appropriate options for Ticker: interval mode without
-	 * waveform output.
-	 */
-	TimerSetup->Options |= (XTTCPS_OPTION_INTERVAL_MODE |
-					      XTTCPS_OPTION_WAVE_DISABLE);
-
-	/*
-	 * Calling the timer setup routine
-	 *  . initialize device
-	 *  . set options
-	 */
-	Status = SetupTimer(TTC_TICK_DEVICE_ID);
-	if(Status != XST_SUCCESS) {
-		return Status;
-	}
-
-	TtcPsTick = &(TtcPsInst[TTC_TICK_DEVICE_ID]);
-
-	/*
-	 * Connect to the interrupt controller
-	 */
-	Status = XScuGic_Connect(&InterruptController, TTC_TICK_INTR_ID,
-		(Xil_ExceptionHandler)TickHandler, (void *)TtcPsTick);
-	if (Status != XST_SUCCESS) {
-		return XST_FAILURE;
-	}
-
-	/*
-	 * Enable the interrupt for the Timer counter
-	 */
-	XScuGic_Enable(&InterruptController, TTC_TICK_INTR_ID);
-
-	/*
-	 * Enable the interrupts for the tick timer/counter
-	 * We only care about the interval timeout.
-	 */
-	//XTtcPs_EnableInterrupts(TtcPsTick, XTTCPS_IXR_INTERVAL_MASK);
-
-	/*
-	 * Start the tick timer/counter
-	 */
-	//XTtcPs_Start(TtcPsTick);
-
-	return Status;
 }
 
 /****************************************************************************/
@@ -497,10 +263,9 @@ int SetupPWM(void)
 * @note		None.
 *
 *****************************************************************************/
-int WaitForDutyCycleFull(void)
+int MainProgram(void)
 {
 	TmrCntrSetup *TimerSetup;
-	u8 DutyCycle;		/* The current output duty cycle */
 	XTtcPs *TtcPs_PWM;	/* Pointer to the instance structure */
 
 	TimerSetup = &(SettingsTable[TTC_PWM_DEVICE_ID]);
@@ -509,72 +274,103 @@ int WaitForDutyCycleFull(void)
 	MatchValues[0] = ((u32) TimerSetup->Interval * (u32) DutyCycles[0]) / 100;
 	MatchValues[1] = ((u32) TimerSetup->Interval * (u32) DutyCycles[1]) / 100;
 
+	// Fill LEDs with default pattern (color gradient BLUE -> RED)
 	for(uint i = 0; i < MAX_LED_NUMBER; i++) {
 		double val = (double) i / MAX_LED_NUMBER;
-		LedType led = {0, (uint) (255.0 * val), (uint) (255.0*(1.0 - val))};
-		Leds[i] = led;
+		u32 led = 0 << 0 | (uint) (255.0 * val) << 8 | (uint) (255.0*(1.0 - val)) << 16;
+		Leds[i].color = led;
 	}
 
 	XTtcPs_EnableInterrupts(TtcPs_PWM, XTTCPS_IXR_INTERVAL_MASK);
-	SetPwmMatchValue();
-	XTtcPs_SetMatchValue(Timer, 0, nextMatchValue);
-	//BitCount = 7;
 
-	/*
-	 * Start the tick timer/counter
-	 */
-	XTtcPs_Start(TtcPs_PWM);
+	//XUartPs_SetBaudRate(XUartPs *InstancePtr, u32 BaudRate);
+	while (XUartPs_IsReceiveData(XPAR_PS7_UART_1_BASEADDR))
+	{
+		XUartPs_ReadReg(XPAR_PS7_UART_1_BASEADDR, XUARTPS_FIFO_OFFSET);
+	}
 
-	while(1);
 
-	while(1) {
-		/*
-		 * Initialize some variables used by the interrupts and in loops.
-		 */
-		DutyCycle = PWM_DELTA_DUTY;
-		PWM_UpdateFlag = TRUE;
-		ErrorCount = 0;
+	u8 uartByteCount = 0;
+	u32 command;
+	//XTtcPs_Start(Timer);
+	StartPwm();
 
-		/*
-		 * Loop until 100% duty cycle in the PWM output.
-		 */
-		while (DutyCycle <= 100) {
+	while(1)
+	{
+		u8 data = 0;
+		if (XUartPs_IsReceiveData(XPAR_PS7_UART_1_BASEADDR))
+		{
+			data = XUartPs_ReadReg(XPAR_PS7_UART_1_BASEADDR, XUARTPS_FIFO_OFFSET);
+			switch(commandState) {
+			case Command:
+				command = command << 8 | data;
+				uartByteCount++;
+				if(uartByteCount >= 4) {
+					uartByteCount = 0;
+					commandState = Data;
+				}
+				break;
 
-			/*
-			 * If error occurs, disable interrupts, and exit.
-			 */
-			if (0 != ErrorCount) {
-				return XST_FAILURE;
+			case Data:
+				HandleCommands(command, data);
+				break;
 			}
-
-			/*
-			 * The Ticker interrupt sets a flag for PWM to update its duty
-			 * cycle.
-			 */
-			if (PWM_UpdateFlag) {
-				/* Calculate the new register setting here, not at the
-				 * time critical interrupt level.
-				 */
-				MatchValue = (TimerSetup->Interval * DutyCycle) / 100;
-
-				/*
-				 * Change the PWM duty cycle
-				 */
-				DutyCycle += PWM_DELTA_DUTY;
-
-				/*
-				 * Enable the PWM Interval interrupt
-				 */
-				XTtcPs_EnableInterrupts(TtcPs_PWM,
-							 XTTCPS_IXR_INTERVAL_MASK);
-
-				PWM_UpdateFlag = FALSE;
-
-			}
+			xil_printf("%c", data);
 		}
 	}
+
 	return XST_SUCCESS;
 }
+
+int HandleCommands(u32 command, u8 data) {
+	//static u8 dataBuffer[1024] = {0};
+	static u32 dataCount = 0;
+	static u32 lastIndex = 0;
+	u8 reset = 0;
+	//dataBuffer[dataCount] = data;
+
+
+	switch(command & COMMAND_ID_MASK) {
+	case COMMAND_SET_SINGLE_LED:
+
+		break;
+
+	case COMMAND_SET_MULTIPLE_LEDS:
+		// Data contains number of LEDs -> 3 byte per Led
+		if(dataCount == 0) {
+			lastIndex = (((command & COMMAND_SET_MULTIPLE_LEDS_NUMBER_MASK) >> COMMAND_SET_MULTIPLE_LEDS_NUMBER_OFFSET) << 2) - 1;
+		}
+		LedType* led = &Leds[(dataCount) >> 2];
+		led->color = (led->color & (~(0x000000FF << (((dataCount) & 3) * 8)))) | (data << (((dataCount) & 3) * 8));
+
+		if(dataCount >= lastIndex) {
+			reset = 1;
+		}
+		break;
+	}
+
+	if(reset) {
+		dataCount = 0;
+		StartPwm();
+		commandState = Command;
+	}
+	else {
+		dataCount++;
+	}
+
+	return 0;
+}
+
+void StartPwm() {
+	while(PwmStarted);
+	PwmStarted = 1;
+	SetPwmMatchValue();
+	XTtcPs_SetMatchValue(Timer, 0, nextMatchValue);
+	XTtcPs_EnableInterrupts(Timer, XTTCPS_IXR_INTERVAL_MASK);
+	//usleep(1000);
+	XTtcPs_Start(Timer);
+}
+
 /****************************************************************************/
 /**
 *
@@ -703,55 +499,8 @@ static int SetupInterruptSystem(u16 IntcDeviceID,
 	return XST_SUCCESS;
 }
 
-/***************************************************************************/
-/**
-*
-* This function is the handler which handles the periodic tick interrupt.
-* It updates its count, and set a flag to signal PWM timer counter to
-* update its duty cycle.
-*
-* This handler provides an example of how to handle data for the TTC and
-* is application specific.
-*
-* @param	CallBackRef contains a callback reference from the driver, in
-*		this case it is the instance pointer for the TTC driver.
-*
-* @return	None.
-*
-* @note		None.
-*
-*****************************************************************************/
-static void TickHandler(void *CallBackRef)
-{
-	u32 StatusEvent;
-
-	/*
-	 * Read the interrupt status, then write it back to clear the interrupt.
-	 */
-	StatusEvent = XTtcPs_GetInterruptStatus((XTtcPs *)CallBackRef);
-	XTtcPs_ClearInterruptStatus((XTtcPs *)CallBackRef, StatusEvent);
-
-	if (0 != (XTTCPS_IXR_INTERVAL_MASK & StatusEvent)) {
-		TickCount++;
-
-		if (TICKS_PER_CHANGE_PERIOD == TickCount) {
-			TickCount = 0;
-			PWM_UpdateFlag = TRUE;
-		}
-
-	}
-	else {
-		/*
-		 * The Interval event should be the only one enabled. If it is
-		 * not it is an error
-		 */
-		ErrorCount++;
-	}
-}
-
 static void SetPwmMatchValue(void)
 {
-	//XTtcPs *Timer = &(TtcPsInst[TTC_PWM_DEVICE_ID]);
 	if(BitCount >= 8)
 	{
 		BitCount = 7;
@@ -760,9 +509,18 @@ static void SetPwmMatchValue(void)
 			ByteCount = 0;
 			if(++currentLed > &Leds[MAX_LED_NUMBER - 1]) {
 				currentLed = &Leds[0];
-				XTtcPs_DisableInterrupts(Timer, XTTCPS_IXR_ALL_MASK);
-				XTtcPs_WriteReg(Timer->Config.BaseAddress, XTTCPS_CNT_CNTRL_OFFSET, 0x11);
+				XTtcPs_DisableInterrupts(Timer, XTTCPS_IXR_INTERVAL_MASK);
+				//XTtcPs_WriteReg(Timer->Config.BaseAddress, XTTCPS_CNT_CNTRL_OFFSET, 0x11);
 				XTtcPs_Stop(Timer);
+				XTtcPs_ResetCounterValue(Timer);
+				PwmStarted = 0;
+				u8* colorPtr = ((u8*) currentLed) + ByteCount;
+				if(*colorPtr & (1 << BitCount)) {
+					nextMatchValue = MatchValues[1];
+				}
+				else {
+					nextMatchValue = MatchValues[0];
+				}
 				return;
 			}
 		}
@@ -771,27 +529,11 @@ static void SetPwmMatchValue(void)
 	u8* colorPtr = ((u8*) currentLed) + ByteCount;
 	if(*colorPtr & (1 << BitCount)) {
 		nextMatchValue = MatchValues[1];
-		//XTtcPs_SetMatchValue(Timer, 0, MatchValues[1]);
 	}
 	else {
 		nextMatchValue = MatchValues[0];
-		//XTtcPs_SetMatchValue(Timer, 0, MatchValues[0]);
 	}
 	BitCount--;
-	/*
-	if(--BitCount >= 8) {
-		BitCount = 7;
-		if(++ByteCount >= 1)
-		{
-			ByteCount = 0;
-			if(++currentLed > &Leds[0]) {
-				currentLed = &Leds[0];
-				XTtcPs_DisableInterrupts(Timer, XTTCPS_IXR_ALL_MASK);
-				XTtcPs_WriteReg(Timer->Config.BaseAddress, XTTCPS_CNT_CNTRL_OFFSET, 0x11);
-				XTtcPs_Stop(Timer);
-			}
-		}
-	}*/
 }
 
 /***************************************************************************/
@@ -819,19 +561,7 @@ static void PWMHandler(void *CallBackRef)
 	 * Read the interrupt status, then write it back to clear the interrupt.
 	 */
 	XTtcPs_SetMatchValue(Timer, 0, nextMatchValue);
+	SetPwmMatchValue();
 	StatusEvent = XTtcPs_GetInterruptStatus(Timer);
 	XTtcPs_ClearInterruptStatus(Timer, StatusEvent);
-
-	//if (0 != (XTTCPS_IXR_INTERVAL_MASK & StatusEvent)) {
-		SetPwmMatchValue();
-		//XTtcPs_SetMatchValue(Timer, 0, *MatchReg);
-	//}
-	//else {
-		/*
-		 * If it is not Interval event, it is an error.
-		 */
-		//ErrorCount++;
-	//}
-
-	//XTtcPs_DisableInterrupts(Timer, XTTCPS_IXR_ALL_MASK);
 }
