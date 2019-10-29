@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZyboControl", "ZyboControl\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZyboLogic", "ZyboLogic\ZyboLogic.csproj", "{6259DDDB-C703-4A41-812A-E3478C19F245}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Utilities", "Utilities\Utilities.csproj", "{1B43CF95-A9CD-417D-800A-F75D23E92659}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{6259DDDB-C703-4A41-812A-E3478C19F245}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6259DDDB-C703-4A41-812A-E3478C19F245}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6259DDDB-C703-4A41-812A-E3478C19F245}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1B43CF95-A9CD-417D-800A-F75D23E92659}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1B43CF95-A9CD-417D-800A-F75D23E92659}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1B43CF95-A9CD-417D-800A-F75D23E92659}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1B43CF95-A9CD-417D-800A-F75D23E92659}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

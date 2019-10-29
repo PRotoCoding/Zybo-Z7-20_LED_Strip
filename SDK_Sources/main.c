@@ -17,7 +17,7 @@
 #define COMMAND_SET_MULTIPLE_LEDS_NUMBER_MASK	0xFF00
 #define COMMAND_SET_MULTIPLE_LEDS_NUMBER_OFFSET	8
 
-
+#define COMMAND_RESPONSE_OK						0xAA
 /************************** Constant Definitions *****************************/
 /*
  * The following constants map to the XPAR parameters created in the
@@ -315,7 +315,7 @@ int MainProgram(void)
 				HandleCommands(command, data);
 				break;
 			}
-			xil_printf("%c", data);
+			//xil_printf("%c", data);
 		}
 	}
 
@@ -353,6 +353,7 @@ int HandleCommands(u32 command, u8 data) {
 		dataCount = 0;
 		StartPwm();
 		commandState = Command;
+		XUartPs_SendByte(XPAR_PS7_UART_1_BASEADDR, COMMAND_RESPONSE_OK);
 	}
 	else {
 		dataCount++;

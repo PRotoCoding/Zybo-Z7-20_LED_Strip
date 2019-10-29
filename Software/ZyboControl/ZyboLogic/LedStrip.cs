@@ -21,6 +21,23 @@ namespace ZyboLogic
             }
         }
 
+        public void ApplyFixColor(byte r, byte g, byte b)
+        {
+            for(int i = 0; i < NumberOfLeds; i++)
+            {
+                Leds[i] = new Led(g, r, b);
+            }
+        }
+
+        public void ApplyColorGradient(byte r1, byte g1, byte b1, byte r2, byte g2, byte b2)
+        {
+            for(int i = 0; i < NumberOfLeds; i++)
+            {
+                double val = (double)i / NumberOfLeds;
+                Leds[i] = new Led(Convert.ToByte(((double)(g2 - g1)) / NumberOfLeds * i + g1), Convert.ToByte(((double)(r2 - r1)) / NumberOfLeds * i + r1), Convert.ToByte(((double)(b2 - b1)) / NumberOfLeds * i + b1));
+            }
+        }
+
         public byte[] ToByteArray()
         {
             int i = 0;

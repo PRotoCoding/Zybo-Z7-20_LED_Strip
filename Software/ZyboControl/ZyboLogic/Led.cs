@@ -23,5 +23,10 @@ namespace ZyboLogic
         {
             return new byte[] { Green, Red, Blue, 0 };
         }
+
+        public override string ToString()
+        {
+            return BitConverter.ToString(ToByteArray());
+        }
     }
 }

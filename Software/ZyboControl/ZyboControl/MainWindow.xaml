@@ -3,13 +3,83 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
+        xmlns:oxy="clr-namespace:OxyPlot.Wpf;assembly=OxyPlot.Wpf" 
         xmlns:local="clr-namespace:ZyboControl"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="MainWindow" Height="Auto" Width="Auto">
     <Grid>
-        <ComboBox x:Name="comboBox" HorizontalAlignment="Left" Margin="185,10,0,0" VerticalAlignment="Top" Width="120"/>
-        <Label x:Name="serialPortLabel" Content="Serial Port" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top"/>
-        <Button x:Name="sendButton" Content="Send" HorizontalAlignment="Left" Margin="206,56,0,0" VerticalAlignment="Top" Width="75" IsEnabled="False"/>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"></ColumnDefinition>
+                    <ColumnDefinition Width="*"></ColumnDefinition>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Label Grid.Row="0" Grid.Column="0" FontSize="16" FontFamily="Arial Black" x:Name="serialPortLabel" Content="Serial Port" HorizontalAlignment="Stretch" Margin="0,3,0,0" VerticalAlignment="Top"/>
+                <ComboBox Grid.Row="0" Grid.Column="1" x:Name="comboBox" HorizontalAlignment="Stretch" VerticalAlignment="Center" Margin="10,5,10,5"/>
+                <Label Grid.Row="1" Grid.Column="0" FontSize="16" FontFamily="Arial Black" x:Name="checkBoxLabel" Content="Enable Music LEDs" HorizontalAlignment="Stretch" Margin="0,3,0,0" VerticalAlignment="Top"/>
+                <CheckBox Grid.Row="1" Grid.Column="1" x:Name="startMusicLeds" VerticalAlignment="Center" Margin="10,0,0,0" IsChecked="False"></CheckBox>
+                <!--Label Grid.Row="2" Grid.Column="0"  x:Name="programFpgaLabel" Content="Program FPGA" HorizontalAlignment="Stretch" Margin="0,3,0,0" VerticalAlignment="Top"/-->
+                <StackPanel Orientation="Horizontal" Grid.Row="2" Grid.Column="1">
+                    <Button x:Name="programFpgaButton" Content="Program FPGA (PL only)" FontSize="16" FontFamily="Arial Black" Margin="10,5,0,5" HorizontalAlignment="Left"></Button>
+                    <Button x:Name="programCore0Button" Content="Launch App on Core #0" FontSize="16" FontFamily="Arial Black" Margin="10,5,0,5" HorizontalAlignment="Left"></Button>
+                </StackPanel>
+
+            </Grid>
+
+            <oxy:PlotView Grid.Row="1" Model="{Binding AudioSignalModel}" />
+            <oxy:PlotView Grid.Row="2" Model="{Binding FrequencyModel}" />
+            <StackPanel Grid.Row="3" Margin="40,0,10,0" Orientation="Vertical">
+                <Label Content="Live LED View" FontSize="16" FontFamily="Arial Black" HorizontalContentAlignment="Center"></Label>
+                <Grid Name="ledGrid">
+
+                </Grid>
+            </StackPanel>
+            <Grid Grid.Row="4" Margin="10,2, 10,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"></ColumnDefinition>
+                    <ColumnDefinition Width="*"></ColumnDefinition>
+                    <ColumnDefinition Width="*"></ColumnDefinition>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="2">
+                    <xctk:ColorPicker Width="60" Grid.Column="2" Name="GradientColor2" DropDownBackground="AliceBlue" HorizontalAlignment="Right"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1">
+                    <!--Label Content="Single Color" /-->
+                    <xctk:ColorPicker IsEnabled="False" Width="60" Grid.Column="2" Name="ClrPcker_Background" DropDownBackground="AliceBlue" SelectedColorChanged="ClrPcker_Background_SelectedColorChanged" HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="0">
+                    <xctk:ColorPicker Margin="30, 0, 0, 0" Width="60" Grid.Column="2" Name="GradientColor1" DropDownBackground="AliceBlue" HorizontalAlignment="Left"/>
+                </StackPanel>
+
+
+
+            </Grid>
+            <StackPanel  Grid.Row="5" Margin="10,10,10,10">
+                <Label Content="Console Output" FontSize="16" FontFamily="Arial Black"/>
+                <TextBox Name="ConsoleOutText" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Height="200" IsReadOnly="True"/>
+            </StackPanel>
+        </Grid>
 
     </Grid>
 </Window>
